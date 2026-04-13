@@ -74,9 +74,9 @@ release-upload-ref:
 	      exit 1; \
 	      ;; \
 	  esac; \
-	  $(MAKE) -C "$(PUBLIC_RELEASE_SRC_DIR)" \
-	    -f Makefile -f make/release-upload.mk \
-	    GOWORK=off \
+		  $(MAKE) -C "$(PUBLIC_RELEASE_SRC_DIR)" \
+		    -f Makefile \
+		    GOWORK=off \
 	    APP_NAME="$(APP_NAME)" \
 	    APP_PATH="$(APP_PATH)" \
 	    BUILD_PATH=./dist \
