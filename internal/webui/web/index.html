@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Weixin Bot Console</title>
+  <style>
+    :root {
+      --bg: #f5f8ff;
+      --bg-2: #e9f1ff;
+      --panel: rgba(255, 255, 255, 0.88);
+      --panel-strong: rgba(247, 251, 255, 0.98);
+      --line: rgba(40, 88, 178, 0.12);
+      --line-strong: rgba(20, 93, 255, 0.34);
+      --text: #10203d;
+      --muted: #64789a;
+      --accent: #2ea6ff;
+      --accent-2: #0d1630;
+      --glow: rgba(46, 166, 255, 0.35);
+      --warn: #ff7b7b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Avenir Next", "PingFang SC", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(20, 93, 255, 0.10), transparent 24%),
+        radial-gradient(circle at 88% 14%, rgba(46, 166, 255, 0.08), transparent 26%),
+        radial-gradient(circle at 78% 78%, rgba(62, 119, 255, 0.08), transparent 22%),
+        linear-gradient(135deg, #f8fbff, #eef4ff 38%, #edf4ff 68%, #f7faff);
+      overflow: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(91, 166, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(91, 166, 255, 0.035) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: radial-gradient(circle at center, black 55%, transparent 100%);
+      pointer-events: none;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      inset: -20%;
+      background:
+        conic-gradient(from 180deg at 50% 50%, transparent, rgba(46, 166, 255, 0.045), transparent 35%, rgba(20, 93, 255, 0.05), transparent 70%);
+      animation: drift 18s linear infinite;
+      filter: blur(40px);
+      pointer-events: none;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 0;
+      box-shadow:
+        0 0 0 1px rgba(91, 166, 255, 0.06) inset,
+        0 18px 50px rgba(13, 32, 76, 0.04),
+        0 0 40px rgba(20, 93, 255, 0.04);
+      backdrop-filter: blur(12px);
+      min-height: 0;
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 6px;
+      min-height: 0;
+      overflow-y: auto;
+      border-right: 1px solid var(--line);
+      border-left: 0;
+      border-top: 0;
+      border-bottom: 0;
+    }
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .toolbar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: 0.01em;
+    }
+    .tab-row {
+      display: flex;
+      justify-content: flex-start;
+    }
+    .scroll-section {
+      display: grid;
+      gap: 10px;
+      min-height: auto;
+      overflow: visible;
+    }
+    .hidden {
+      display: none !important;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h2 { font-size: 16px; margin-bottom: 10px; }
+    .muted { color: var(--muted); }
+    .meta { display: grid; gap: 8px; font-size: 14px; }
+    .qr-card img {
+      width: 100%;
+      border-radius: 10px;
+      display: block;
+      background: #fff;
+      min-height: 220px;
+      border: 1px solid var(--line);
+      object-fit: contain;
+      box-shadow: 0 0 30px rgba(46, 166, 255, 0.08);
+    }
+    .qr-card-head {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 8px;
+    }
+    .qr-close {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 999px;
+      font-size: 16px;
+      line-height: 1;
+      background: rgba(16, 32, 61, 0.84);
+    }
+    .qr-modal {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(8, 14, 28, 0.46);
+      backdrop-filter: blur(8px);
+      z-index: 10;
+      padding: 24px;
+    }
+    .qr-dialog {
+      width: min(520px, 100%);
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 30px 80px rgba(10, 24, 56, 0.22);
+      padding: 16px;
+    }
+    .qr-dialog-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .qr-dialog-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .qr-empty {
+      min-height: 220px;
+      display: grid;
+      place-items: center;
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      color: var(--muted);
+      padding: 16px;
+      text-align: center;
+      background: rgba(241, 247, 255, 0.95);
+    }
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      background: #0a0a0d;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow:
+        inset 0 0 0 1px rgba(53, 102, 196, 0.18),
+        0 10px 24px rgba(12, 18, 34, 0.14);
+    }
+    button.secondary {
+      background: #05070c;
+    }
+    button:hover {
+      box-shadow:
+        inset 0 0 0 1px rgba(46, 166, 255, 0.34),
+        0 0 0 1px rgba(46, 166, 255, 0.12),
+        0 12px 28px rgba(24, 66, 148, 0.16);
+    }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .contacts {
+      display: grid;
+      gap: 10px;
+      max-height: 42vh;
+      overflow: auto;
+    }
+    .accounts {
+      display: grid;
+      gap: 10px;
+      overflow: visible;
+      min-height: auto;
+      align-content: start;
+    }
+    .accounts-panel {
+      display: grid;
+      gap: 10px;
+      min-height: auto;
+      overflow: visible;
+      align-content: start;
+    }
+    .qr-status-list {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .tab-btn {
+      border: 1px solid rgba(46, 166, 255, 0.14);
+      background: rgba(255, 255, 255, 0.82);
+      color: #35527f;
+      padding: 7px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: none;
+      white-space: nowrap;
+    }
+    .tab-btn.active {
+      background: rgba(46, 166, 255, 0.12);
+      color: #165fcd;
+      border-color: rgba(46, 166, 255, 0.26);
+    }
+    .subsection-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4c6389;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .status-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.96);
+    }
+    .status-card.expired {
+      background: rgba(255, 246, 246, 0.96);
+      border-color: rgba(255, 123, 123, 0.22);
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a66d9;
+      background: rgba(46, 166, 255, 0.1);
+      border: 1px solid rgba(46, 166, 255, 0.16);
+    }
+    .status-badge.expired {
+      color: #c84f4f;
+      background: rgba(255, 123, 123, 0.1);
+      border-color: rgba(255, 123, 123, 0.16);
+    }
+    .account-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .account-badge {
+      flex: 0 0 auto;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #1a66d9;
+      background: rgba(46, 166, 255, 0.10);
+      border: 1px solid rgba(46, 166, 255, 0.18);
+    }
+    .contact {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.96);
+      overflow: hidden;
+    }
+    .contact.active {
+      border-color: var(--line-strong);
+      box-shadow:
+        inset 0 0 0 1px rgba(46, 166, 255, 0.2),
+        0 0 24px rgba(46, 166, 255, 0.08);
+    }
+    .contact-id {
+      display: block;
+      font-size: 12px;
+      line-height: 1.35;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
+    .account-meta {
+      margin-top: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-all;
+      overflow-wrap: anywhere;
+      line-height: 1.35;
+    }
+    .main {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 16px;
+      gap: 16px;
+      min-height: 0;
+      border: 0;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .messages {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.94);
+      min-height: 0;
+    }
+    .bubble {
+      max-width: min(68%, 640px);
+      min-width: 64px;
+      width: fit-content;
+      padding: 13px 16px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      border: 1px solid rgba(91, 166, 255, 0.18);
+      line-height: 1.45;
+    }
+    .bubble.inbound {
+      align-self: flex-start;
+      background: #ffffff;
+      border-radius: 10px;
+      border-color: rgba(16, 32, 61, 0.08);
+    }
+    .bubble.outbound {
+      align-self: flex-end;
+      background: #f4f8ff;
+      color: var(--text);
+      border-radius: 10px;
+      border-color: rgba(46, 166, 255, 0.28);
+    }
+    .bubble.draft {
+      position: relative;
+      padding-right: 40px;
+    }
+    .bubble.failed {
+      border-color: rgba(255, 123, 123, 0.5);
+      background: rgba(255, 246, 246, 0.98);
+    }
+    .bubble.media {
+      padding: 10px;
+      max-width: min(52%, 420px);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 247, 255, 0.98));
+      border-color: rgba(46, 166, 255, 0.24);
+    }
+    .bubble.media.inbound {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.98));
+    }
+    .media-card {
+      display: grid;
+      gap: 10px;
+    }
+    .media-preview {
+      min-height: 132px;
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(46, 166, 255, 0.16);
+      background:
+        radial-gradient(circle at 18% 18%, rgba(46, 166, 255, 0.18), transparent 28%),
+        linear-gradient(135deg, rgba(233, 243, 255, 0.95), rgba(245, 249, 255, 0.98));
+      display: grid;
+      place-items: center;
+      color: #3f639a;
+      font-size: 34px;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+      object-fit: cover;
+    }
+    .media-caption {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .media-kind {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #1a66d9;
+    }
+    .media-name {
+      font-size: 13px;
+      color: var(--text);
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+    .bubble-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .draft-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      color: #1a66d9;
+    }
+    .draft-label.failed {
+      color: #d14c4c;
+    }
+    .typing-dots {
+      display: inline-flex;
+      gap: 3px;
+    }
+    .typing-dots span {
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: currentColor;
+      opacity: 0.2;
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    .draft-spinner {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      border: 2px solid rgba(46, 166, 255, 0.18);
+      border-top-color: #2e7bff;
+      animation: spin 0.8s linear infinite;
+    }
+    .composer {
+      position: relative;
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    .composer-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 18px;
+    }
+    .selected-contact-panel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .panel-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .selected-contact-name {
+      margin: 8px 0 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .selected-contact-name.editing {
+      display: none;
+    }
+    .remark-input {
+      min-width: 220px;
+      max-width: min(420px, 60vw);
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      display: none;
+    }
+    .remark-input.editing {
+      display: inline-flex;
+    }
+    .icon-btn {
+      padding: 8px 10px;
+      line-height: 1;
+      min-width: 40px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 86px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      padding: 14px 170px 14px 16px;
+      resize: vertical;
+      font: inherit;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.94);
+    }
+    textarea::placeholder { color: #6f8eb6; }
+    .composer-actions {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: inline-flex;
+      align-items: stretch;
+      gap: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 0 1px rgba(53, 102, 196, 0.18),
+        0 10px 24px rgba(12, 18, 34, 0.14);
+    }
+    .composer-actions button {
+      height: 42px;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .composer-actions button + button {
+      border-left: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .attach-embedded {
+      width: 44px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(46, 166, 255, 0.08);
+      color: #1a66d9;
+      font-weight: 600;
+      box-shadow: inset 0 0 0 1px rgba(46, 166, 255, 0.12);
+    }
+    .error {
+      color: var(--warn);
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }
+    a { color: #7fd1ff; }
+    @keyframes drift {
+      from { transform: rotate(0deg) scale(1); }
+      to { transform: rotate(360deg) scale(1.04); }
+    }
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.16; transform: translateY(0); }
+      40% { opacity: 0.58; transform: translateY(-1px); }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+      body { overflow: auto; }
+      .sidebar {
+        overflow: visible;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .messages { min-height: 40vh; }
+      .qr-modal { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar panel">
+      <div class="toolbar">
+        <div class="toolbar-title">用户列表</div>
+      </div>
+      <div class="tab-row">
+        <div id="accountTabs" class="tabs"></div>
+      </div>
+      <section class="scroll-section">
+        <div id="accounts" class="accounts"></div>
+      </section>
+    </aside>
+    <main class="main panel">
+      <div class="header">
+        <div>
+          <div id="selectedContactPanel" class="selected-contact-panel">
+            <h2 id="panelTitle" class="panel-title">聊天调试</h2>
+            <input id="remarkInput" class="remark-input" type="text" placeholder="输入备注名" disabled />
+            <button id="toggleRemarkBtn" class="secondary icon-btn" type="button" disabled aria-label="编辑备注">✎</button>
+          </div>
+          <p id="selectedUser" class="selected-contact-name">请先选择一个已建立会话的联系人</p>
+        </div>
+        <button id="loginBtn" class="secondary">生成邀请二维码</button>
+      </div>
+      <section id="messages" class="messages"></section>
+      <section class="composer">
+        <textarea id="messageInput" placeholder="输入要发送给当前联系人的测试消息"></textarea>
+        <input id="imageInput" type="file" accept="image/*" class="hidden" />
+        <div class="composer-actions">
+          <button id="sendBtn" class="send-embedded" disabled>发送</button>
+          <button id="imageBtn" class="attach-embedded secondary" type="button" disabled aria-label="发送图片">＋</button>
+        </div>
+        <div id="sendHint" class="composer-hint"></div>
+      </section>
+    </main>
+  </div>
+  <div id="qrModal" class="qr-modal hidden">
+    <div class="qr-dialog">
+      <div class="qr-dialog-head">
+        <div class="qr-dialog-title">登录二维码</div>
+        <button id="closeQrBtn" class="qr-close" type="button" aria-label="关闭二维码">×</button>
+      </div>
+      <section class="qr-card">
+        <div id="qrWrap" class="qr-empty hidden">点击“生成二维码”获取二维码</div>
+      </section>
+    </div>
+  </div>
+  <script>
+    const QR_DISMISS_STORAGE_KEY = "weixin-echo-qr-dismissed-token";
+    const state = { selectedUserId: "", accountsTab: "online", qrDismissed: false, remarkEditing: false };
+    let renderedQrToken = "";
+    let refreshInFlight = false;
+    let refreshQueued = false;
+    const localImagePreviews = new Map();
+    const renderCache = {
+      accountTabsHtml: "",
+      accountsHtml: "",
+      panelTitleText: "",
+      selectedUserText: "",
+      messagesSignature: "",
+      sendDisabled: true,
+      sendPlaceholder: "",
+      sendHint: "",
+      remarkInputValue: "",
+      remarkInputDisabled: true,
+      toggleRemarkText: "",
+      toggleRemarkDisabled: true,
+    };
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[char]));
+    }
+
+    function draftMeta(status) {
+      if (status === "sending") return { label: "正在发送到微信", failed: false, dots: true };
+      if (status === "failed") return { label: "草稿发送失败", failed: true, dots: false };
+      return { label: "AI 正在流式生成", failed: false, dots: true };
+    }
+
+    function parseMediaMessage(text) {
+      const value = String(text || "").trim();
+      if (!value.startsWith("[图片已发送]")) {
+        return null;
+      }
+      const name = value.replace(/^\[图片已发送\]\s*/, "").trim();
+      return {
+        kind: "image",
+        label: "图片",
+        name: name || "已发送图片",
+        icon: "🖼",
+        previewSrc: localImagePreviews.get(value) || ""
+      };
+    }
+
+    function loadDismissedQrToken() {
+      try {
+        return localStorage.getItem(QR_DISMISS_STORAGE_KEY) || "";
+      } catch {
+        return "";
+      }
+    }
+
+    function saveDismissedQrToken(token) {
+      try {
+        if (token) {
+          localStorage.setItem(QR_DISMISS_STORAGE_KEY, token);
+        } else {
+          localStorage.removeItem(QR_DISMISS_STORAGE_KEY);
+        }
+      } catch {
+      }
+    }
+
+    function renderLastError(errorText) {
+      const sidebar = document.querySelector(".sidebar");
+      const existing = document.getElementById("lastError");
+      if (!errorText) {
+        existing?.remove();
+        return;
+      }
+      const node = existing || document.createElement("div");
+      node.id = "lastError";
+      node.className = "error";
+      node.textContent = errorText;
+      if (!existing) {
+        sidebar.insertBefore(node, document.querySelector(".scroll-section"));
+      }
+    }
+
+    async function refreshState() {
+      if (refreshInFlight) {
+        refreshQueued = true;
+        return null;
+      }
+      refreshInFlight = true;
+      try {
+        const res = await fetch("/api/state");
+        const data = await res.json();
+        data.accounts = Array.isArray(data.accounts) ? data.accounts : [];
+        data.pending_qr_codes = Array.isArray(data.pending_qr_codes) ? data.pending_qr_codes : [];
+        data.expired_qr_codes = Array.isArray(data.expired_qr_codes) ? data.expired_qr_codes : [];
+        data.contacts = Array.isArray(data.contacts) ? data.contacts : [];
+        data.messages = Array.isArray(data.messages) ? data.messages : [];
+        render(data);
+        return data;
+      } finally {
+        refreshInFlight = false;
+        if (refreshQueued) {
+          refreshQueued = false;
+          refreshState();
+        }
+      }
+    }
+
+    function renderSharedQRCodes(items, emptyText, type) {
+      if (!items.length) {
+        return `<div class="muted">${escapeHtml(emptyText)}</div>`;
+      }
+      return items.map((item) => `
+        <div class="status-card${type === "expired" ? " expired" : ""}">
+          <div class="account-row">
+            <strong class="contact-id" title="${escapeHtml(item.qrcode)}">${escapeHtml(item.shared_to_user_id || "未记录分享对象")}</strong>
+            <span class="status-badge${type === "expired" ? " expired" : ""}">${type === "expired" ? "已过期" : "等待扫码"}</span>
+          </div>
+          ${item.source_account_id ? `<div class="account-meta">来源 Bot: ${escapeHtml(item.source_account_id)}</div>` : ""}
+          ${item.created_at ? `<div class="account-meta">创建时间: ${escapeHtml(item.created_at)}</div>` : ""}
+          ${item.expired_at ? `<div class="account-meta">过期时间: ${escapeHtml(item.expired_at)}</div>` : ""}
+        </div>
+      `).join("");
+    }
+
+    function renderAccountCards(items, activeAccountId, emptyText) {
+      if (!items.length) {
+        return `<div class="muted">${escapeHtml(emptyText)}</div>`;
+      }
+      return items.map((account) => `
+        <div class="contact${account.account_id === activeAccountId ? " active" : ""}" data-account-id="${escapeHtml(account.account_id)}">
+          <div class="account-row">
+            <strong class="contact-id" title="${escapeHtml(account.account_id)}">机器人 ID: ${escapeHtml(account.account_id)}</strong>
+            ${account.account_id === activeAccountId ? '<span class="account-badge">当前机器人</span>' : ''}
+          </div>
+          <div class="account-meta">${escapeHtml(account.status || (account.logged_in ? "active" : "inactive"))}</div>
+          <div class="account-meta" title="${escapeHtml(account.user_id || "")}">微信用户 ID: ${escapeHtml(account.user_id || "未绑定微信账号")}</div>
+          ${account.created_at ? `<div class="account-meta">创建时间: ${escapeHtml(account.created_at)}</div>` : ''}
+          ${account.last_login_confirmed_at ? `<div class="account-meta">最近登录确认: ${escapeHtml(account.last_login_confirmed_at)}</div>` : ''}
+          ${account.replaced_by ? `<div class="account-meta" title="${escapeHtml(account.replaced_by)}">被替换为: ${escapeHtml(account.replaced_by)}</div>` : ''}
+          ${account.last_error ? `<div class="account-meta" title="${escapeHtml(account.last_error)}">失败原因: ${escapeHtml(account.last_error)}</div>` : ''}
+        </div>
+      `).join("");
+    }
+
+    function renderAccountsPanel(data) {
+      const onlineAccounts = data.accounts.filter((account) => account.logged_in);
+      const offlineAccounts = data.accounts.filter((account) => !account.logged_in);
+      const counts = {
+        pending: data.pending_qr_codes.length,
+        expired: data.expired_qr_codes.length,
+        online: onlineAccounts.length,
+        offline: offlineAccounts.length,
+      };
+      const tabs = [
+        { key: "online", label: `已登录 ${counts.online}` },
+        { key: "offline", label: `未登录 ${counts.offline}` },
+        { key: "pending", label: `等待中 ${counts.pending}` },
+        { key: "expired", label: `已过期 ${counts.expired}` },
+      ];
+      if (!tabs.some((tab) => tab.key === state.accountsTab)) {
+        state.accountsTab = "online";
+      }
+
+      let panelHtml = "";
+      if (state.accountsTab === "pending") {
+        panelHtml = renderSharedQRCodes(data.pending_qr_codes, "当前没有等待扫码的分享二维码。", "pending");
+      } else if (state.accountsTab === "expired") {
+        panelHtml = renderSharedQRCodes(data.expired_qr_codes, "当前没有已过期的分享二维码。", "expired");
+      } else if (state.accountsTab === "offline") {
+        panelHtml = renderAccountCards(offlineAccounts, data.active_account_id, "当前没有未登录的机器人账号。");
+      } else {
+        panelHtml = renderAccountCards(onlineAccounts, data.active_account_id, "当前没有已登录的机器人账号。");
+      }
+
+      return `
+        <div class="accounts-panel">${panelHtml}</div>
+      `;
+    }
+
+    function renderAccountTabs(data) {
+      const onlineAccounts = data.accounts.filter((account) => account.logged_in);
+      const offlineAccounts = data.accounts.filter((account) => !account.logged_in);
+      const tabs = [
+        { key: "online", label: `已登录 ${onlineAccounts.length}` },
+        { key: "offline", label: `未登录 ${offlineAccounts.length}` },
+        { key: "pending", label: `等待中 ${data.pending_qr_codes.length}` },
+        { key: "expired", label: `已过期 ${data.expired_qr_codes.length}` },
+      ];
+      return tabs.map((tab) => `<button class="tab-btn${tab.key === state.accountsTab ? " active" : ""}" data-tab="${tab.key}">${escapeHtml(tab.label)}</button>`).join("");
+    }
+
+    function buildMessagesSignature(data) {
+      return JSON.stringify({
+        messages: data.messages.map((msg) => ({
+          direction: msg.direction || "",
+          text: msg.text || "",
+        })),
+        draft: data.draft_message
+          ? {
+              direction: data.draft_message.direction || "",
+              text: data.draft_message.text || "",
+              status: data.draft_message.status || "",
+            }
+          : null,
+      });
+    }
+
+    function getSelectedContact(data) {
+      if (!data.selected_user_id) {
+        return null;
+      }
+      return data.contacts.find((contact) => contact.user_id === data.selected_user_id) || null;
+    }
+
+    function isRemarkInputFocused() {
+      return document.activeElement === document.getElementById("remarkInput");
+    }
+
+    function exitRemarkEditMode() {
+      state.remarkEditing = false;
+    }
+
+    function syncRemarkEditMode() {
+      const toggleRemarkBtn = document.getElementById("toggleRemarkBtn");
+      const panelTitleEl = document.getElementById("panelTitle");
+      const remarkInputEl = document.getElementById("remarkInput");
+      toggleRemarkBtn.textContent = state.remarkEditing ? "保存" : "✎";
+      toggleRemarkBtn.setAttribute("aria-label", state.remarkEditing ? "保存备注" : "编辑备注");
+      panelTitleEl.classList.toggle("editing", state.remarkEditing);
+      remarkInputEl.classList.toggle("editing", state.remarkEditing);
+    }
+
+    function selectionTouches(node) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+        return false;
+      }
+      const anchorNode = selection.anchorNode;
+      const focusNode = selection.focusNode;
+      return Boolean(
+        (anchorNode && node.contains(anchorNode)) ||
+        (focusNode && node.contains(focusNode))
+      );
+    }
+
+    function renderMessages(data) {
+      const messages = document.getElementById("messages");
+      const nextSignature = buildMessagesSignature(data);
+      if (nextSignature === renderCache.messagesSignature) {
+        return;
+      }
+      if (selectionTouches(messages)) {
+        return;
+      }
+
+      const stickToBottom = messages.scrollHeight - messages.scrollTop - messages.clientHeight < 40;
+      messages.innerHTML = "";
+      for (const msg of data.messages) {
+        const div = document.createElement("div");
+        const media = parseMediaMessage(msg.text);
+        div.className = "bubble " + msg.direction + (media ? " media" : "");
+        if (media) {
+          div.innerHTML = `
+            <div class="media-card">
+              ${media.previewSrc
+                ? `<img class="media-preview" src="${escapeHtml(media.previewSrc)}" alt="${escapeHtml(media.name)}" />`
+                : `<div class="media-preview" aria-hidden="true">${media.icon}</div>`}
+              <div class="media-caption">
+                <div class="media-kind">${escapeHtml(media.label)}</div>
+                <div class="media-name">${escapeHtml(media.name)}</div>
+              </div>
+            </div>
+          `;
+        } else {
+          div.textContent = msg.text || "(空消息)";
+        }
+        messages.appendChild(div);
+      }
+      if (data.draft_message && data.draft_message.direction === "outbound") {
+        const draft = data.draft_message;
+        const meta = draftMeta(draft.status);
+        const draftText = (draft.text || "").trim();
+        const hasDraftText = Boolean(draftText);
+        if (!hasDraftText && !meta.failed) {
+          if (!data.messages.length) {
+            messages.innerHTML = `<div class="muted">这里会显示当前联系人最近的收发消息。</div>`;
+          }
+          if (stickToBottom) {
+            messages.scrollTop = messages.scrollHeight;
+          }
+          renderCache.messagesSignature = nextSignature;
+          return;
+        }
+        const div = document.createElement("div");
+        div.className = "bubble " + draft.direction + " draft" + (meta.failed ? " failed" : "");
+        div.innerHTML = `${meta.failed ? `<div class="bubble-head"><span class="draft-label failed">${escapeHtml(meta.label)}</span></div>` : ""}<div class="draft-body">${escapeHtml(draftText)}</div>${meta.dots ? '<span class="draft-spinner" aria-hidden="true"></span>' : ""}`;
+        messages.appendChild(div);
+      }
+      if (!data.messages.length && !data.draft_message) {
+        messages.innerHTML = `<div class="muted">这里会显示当前联系人最近的收发消息。</div>`;
+      }
+      if (stickToBottom) {
+        messages.scrollTop = messages.scrollHeight;
+      }
+      renderCache.messagesSignature = nextSignature;
+    }
+
+    function render(data) {
+      state.selectedUserId = data.selected_user_id || "";
+      const errorText = data.last_error || data.login.error || "";
+      renderLastError(errorText);
+      const accountTabs = document.getElementById("accountTabs");
+      const nextAccountTabsHtml = renderAccountTabs(data);
+      if (nextAccountTabsHtml !== renderCache.accountTabsHtml) {
+        accountTabs.innerHTML = nextAccountTabsHtml;
+        renderCache.accountTabsHtml = nextAccountTabsHtml;
+        for (const tabBtn of accountTabs.querySelectorAll("[data-tab]")) {
+          tabBtn.onclick = () => {
+            state.accountsTab = tabBtn.getAttribute("data-tab") || "online";
+            renderCache.accountTabsHtml = "";
+            renderCache.accountsHtml = "";
+            render(data);
+          };
+        }
+      }
+
+      const qrWrap = document.getElementById("qrWrap");
+      const qrModal = document.getElementById("qrModal");
+      if (data.login.qrcode_url) {
+        if (renderedQrToken !== data.login.qrcode) {
+          renderedQrToken = data.login.qrcode;
+          state.qrDismissed = loadDismissedQrToken() === renderedQrToken;
+          qrWrap.className = "";
+          qrWrap.innerHTML = `
+            <img src="/api/login/qr-image?q=${encodeURIComponent(data.login.qrcode)}" alt="微信机器人二维码" />
+            <div class="muted" style="margin-top:10px;word-break:break-all;">
+              二维码已在本地生成。如果长时间未扫码，请点击“生成二维码”重新获取。
+            </div>
+          `;
+        }
+        qrWrap.classList.remove("hidden");
+        qrModal.classList.toggle("hidden", state.qrDismissed);
+      } else {
+        renderedQrToken = "";
+        state.qrDismissed = false;
+        saveDismissedQrToken("");
+        qrModal.classList.add("hidden");
+        qrWrap.className = "qr-empty hidden";
+        qrWrap.textContent = "点击“生成二维码”获取二维码";
+      }
+
+      const accounts = document.getElementById("accounts");
+      const nextAccountsHtml = renderAccountsPanel(data);
+      if (nextAccountsHtml !== renderCache.accountsHtml) {
+        accounts.innerHTML = nextAccountsHtml;
+        renderCache.accountsHtml = nextAccountsHtml;
+        for (const accountCard of accounts.querySelectorAll("[data-account-id]")) {
+          accountCard.onclick = async () => {
+            const accountId = accountCard.getAttribute("data-account-id");
+            if (!accountId) return;
+            await fetch("/api/account/select", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ account_id: accountId })
+            });
+            refreshState();
+          };
+        }
+      }
+
+      const selectedContact = getSelectedContact(data);
+      const panelTitleText = selectedContact
+        ? (selectedContact.remark_name || data.account_id || data.active_account_id || "聊天调试")
+        : "聊天调试";
+      if (panelTitleText !== renderCache.panelTitleText) {
+        document.getElementById("panelTitle").textContent = panelTitleText;
+        renderCache.panelTitleText = panelTitleText;
+      }
+      const selectedUserText = selectedContact
+        ? `当前联系人：${selectedContact.user_id}`
+        : "请先选择一个已建立会话的联系人";
+      if (selectedUserText !== renderCache.selectedUserText) {
+        document.getElementById("selectedUser").textContent = selectedUserText;
+        renderCache.selectedUserText = selectedUserText;
+      }
+      const nextRemarkInputValue = selectedContact ? (selectedContact.remark_name || "") : "";
+      if (nextRemarkInputValue !== renderCache.remarkInputValue && !isRemarkInputFocused()) {
+        document.getElementById("remarkInput").value = nextRemarkInputValue;
+        renderCache.remarkInputValue = nextRemarkInputValue;
+      }
+      const nextRemarkInputDisabled = !selectedContact;
+      if (nextRemarkInputDisabled !== renderCache.remarkInputDisabled) {
+        document.getElementById("remarkInput").disabled = nextRemarkInputDisabled;
+        renderCache.remarkInputDisabled = nextRemarkInputDisabled;
+      }
+      const toggleRemarkBtn = document.getElementById("toggleRemarkBtn");
+      if (!selectedContact) {
+        exitRemarkEditMode();
+      }
+      const nextToggleRemarkDisabled = !selectedContact;
+      if (nextToggleRemarkDisabled !== renderCache.toggleRemarkDisabled) {
+        toggleRemarkBtn.disabled = nextToggleRemarkDisabled;
+        renderCache.toggleRemarkDisabled = nextToggleRemarkDisabled;
+      }
+      const nextToggleRemarkText = state.remarkEditing ? "保存" : "✎";
+      if (nextToggleRemarkText !== renderCache.toggleRemarkText) {
+        toggleRemarkBtn.textContent = nextToggleRemarkText;
+        toggleRemarkBtn.setAttribute("aria-label", state.remarkEditing ? "保存备注" : "编辑备注");
+        renderCache.toggleRemarkText = nextToggleRemarkText;
+      }
+      syncRemarkEditMode();
+
+      renderMessages(data);
+
+      const nextSendDisabled = !data.can_send;
+      if (nextSendDisabled !== renderCache.sendDisabled) {
+        document.getElementById("sendBtn").disabled = nextSendDisabled;
+        document.getElementById("imageBtn").disabled = nextSendDisabled;
+        renderCache.sendDisabled = nextSendDisabled;
+      }
+      const nextPlaceholder = data.can_send
+        ? "输入要发送给当前联系人的测试消息"
+        : (data.send_disabled_reason || "当前不能发送消息");
+      if (nextPlaceholder !== renderCache.sendPlaceholder) {
+        document.getElementById("messageInput").placeholder = nextPlaceholder;
+        renderCache.sendPlaceholder = nextPlaceholder;
+      }
+      const nextSendHint = data.can_send
+        ? ""
+        : (data.send_disabled_reason || "当前不能发送消息");
+      if (nextSendHint !== renderCache.sendHint) {
+        document.getElementById("sendHint").textContent = nextSendHint;
+        renderCache.sendHint = nextSendHint;
+      }
+    }
+
+    document.getElementById("loginBtn").onclick = async () => {
+      const btn = document.getElementById("loginBtn");
+      const prevText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "生成中...";
+      state.qrDismissed = false;
+      saveDismissedQrToken("");
+      try {
+        const res = await fetch("/api/login/start", { method: "POST" });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        await refreshState();
+      } catch (err) {
+        lastError.textContent = err instanceof Error ? err.message : String(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = prevText;
+      }
+    };
+
+    document.getElementById("closeQrBtn").onclick = () => {
+      state.qrDismissed = true;
+      saveDismissedQrToken(renderedQrToken);
+      document.getElementById("qrModal").classList.add("hidden");
+    };
+
+    document.getElementById("sendBtn").onclick = async () => {
+      const text = document.getElementById("messageInput").value.trim();
+      if (!text) return;
+      await fetch("/api/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text })
+      });
+      document.getElementById("messageInput").value = "";
+      refreshState();
+    };
+
+    document.getElementById("imageBtn").onclick = () => {
+      document.getElementById("imageInput").click();
+    };
+
+    document.getElementById("imageInput").addEventListener("change", async (event) => {
+      const input = event.target;
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const form = new FormData();
+      form.append("image", file);
+      const previewURL = URL.createObjectURL(file);
+      const messageLabel = `[图片已发送] ${file.name || "已发送图片"}`.trim();
+      const imageBtn = document.getElementById("imageBtn");
+      const prevText = imageBtn.textContent;
+      imageBtn.disabled = true;
+      imageBtn.textContent = "...";
+      try {
+        const res = await fetch("/api/send-image", {
+          method: "POST",
+          body: form
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        localImagePreviews.set(messageLabel, previewURL);
+        renderCache.messagesSignature = "";
+        await refreshState();
+      } catch (err) {
+        URL.revokeObjectURL(previewURL);
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        input.value = "";
+        imageBtn.textContent = prevText;
+        imageBtn.disabled = renderCache.sendDisabled;
+      }
+    });
+
+    document.getElementById("toggleRemarkBtn").onclick = async () => {
+      const selectedUserId = state.selectedUserId || "";
+      if (!selectedUserId) return;
+      const remarkInput = document.getElementById("remarkInput");
+      const toggleRemarkBtn = document.getElementById("toggleRemarkBtn");
+      if (!state.remarkEditing) {
+        state.remarkEditing = true;
+        renderCache.toggleRemarkText = "";
+        syncRemarkEditMode();
+        remarkInput.focus();
+        remarkInput.select();
+        return;
+      }
+      const remarkName = remarkInput.value.trim();
+      toggleRemarkBtn.disabled = true;
+      toggleRemarkBtn.textContent = "...";
+      try {
+        const res = await fetch("/api/contact/remark", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: selectedUserId, remark_name: remarkName })
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || `HTTP ${res.status}`);
+        }
+        exitRemarkEditMode();
+        renderCache.toggleRemarkText = "";
+        renderCache.remarkInputValue = remarkName;
+        await refreshState();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        toggleRemarkBtn.disabled = false;
+      }
+    };
+
+    document.getElementById("remarkInput").addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        document.getElementById("toggleRemarkBtn").click();
+      } else if (event.key === "Escape") {
+        exitRemarkEditMode();
+        renderCache.toggleRemarkText = "";
+        renderCache.remarkInputValue = "";
+        await refreshState();
+      }
+    });
+
+    refreshState();
+    setInterval(refreshState, 1000);
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+.idea/
+dist/
+data/
+**.txt
+**.xlsx
+**.DS_Store
+trashDir
+*.csv
+go.work*

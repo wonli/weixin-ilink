@@ -1,0 +1,8 @@
+ai:
+  provider: deepseek
+  model: deepseek-chat
+  api_key: 你的deepseek-api-key
+  # provider=ollama 时改为本地地址，例如 http://127.0.0.1:11434
+  base_url: ""
+  system_prompt: |
+    你是一个简洁、友好的微信助手，请使用**纯文本**直接回答用户问题。
